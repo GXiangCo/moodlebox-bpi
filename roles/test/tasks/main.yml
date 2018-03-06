@@ -1,0 +1,90 @@
+---
+
+- name: stop NetworkManager
+  systemd:
+    name: NetworkManager
+    state: stopped
+
+
+- name: disable NetworkManager
+  systemd:
+    name: NetworkManager
+    enabled: no
+    masked: yes
+
+# - name: disable display-manager (lightdm)
+#   systemd:
+#     name: display-manager
+#     enabled: no
+#     masked: no
+
+
+- name: configure /etc/network/interfaces
+  blockinfile:
+    path: '/etc/network/interfaces'
+    block: |
+      auto eth0
+      iface eth0 inet dhcp
+#  notify: restart networking
+
+# - name: disable NetworkManager-wait-online.service
+#   systemd:
+#     name: NetworkManager-wait-online
+#     enabled: no
+#     masked: no
+
+- name: disable accounts-daemon.service
+  systemd:
+    name: accounts-daemon
+    enabled: no
+    masked: no
+
+- name: disable ModemManager.service
+  systemd:
+    name: ModemManager
+    enabled: no
+    masked: no
+
+- name: disable pppd-dns.service
+  systemd:
+    name: pppd-dns
+    enabled: no
+    masked: no
+
+- name: update /var/lib/bananapi/bpi-init.d/S10-bpi-hw-wifi.sh
+  template:
+    src: 'S10-bpi-hw-wifi.sh.j2'
+    dest: '/var/lib/bananapi/bpi-init.d/S10-bpi-hw-wifi.sh'
+  # notify: restart networking
+
+- name: uninstall unneeded packages
+  apt:
+    pkg: '{{ item }}'
+    state: 'absent'
+    purge: 'yes'
+  with_flattened:
+    - '{{ moodlebox_uninstall_packages }}'
+  when: 'moodlebox_uninstall_packages is defined'
+
+# - name: install packages needed
+#   apt:
+#     pkg: '{{ item }}'
+#     state: 'present'
+#   with_flattened:
+#     - '{{ moodlebox_install_packages }}'
+
+- name: reboot machine
+  shell: 'sleep 2 && shutdown -r now'
+  async: 1
+  poll: 0
+  ignore_errors: true
+
+- name: wait for machine to come back
+  become: false
+  local_action: wait_for
+  args:
+    host: '{{ ansible_host | default(inventory_hostname) }}'
+    port: 22
+    state: 'started'
+    delay: 10
+    timeout: 90
